@@ -1,0 +1,49 @@
+#!/bin/bash
+# Lock with VaultLock - Nautilus/Nemo Script Integration
+#
+# Install:
+#   mkdir -p ~/.local/share/nautilus/scripts
+#   cp "Lock with VaultLock" ~/.local/share/nautilus/scripts/
+#   chmod +x ~/.local/share/nautilus/scripts/"Lock with VaultLock"
+#
+# For Nemo (Linux Mint):
+#   mkdir -p ~/.local/share/nemo/scripts
+#   cp "Lock with VaultLock" ~/.local/share/nemo/scripts/
+#   chmod +x ~/.local/share/nemo/scripts/"Lock with VaultLock"
+
+# Check if a file was selected (Nautilus passes $NAUTILUS_SCRIPT_SELECTED_FILE_PATHS)
+if [ -z "$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS" ]; then
+    notify-send -i changes-prevent-symbolic "VaultLock" "No folder selected" 2>/dev/null
+    exit 1
+fi
+
+# Get the first selected path
+SELECTED_PATH=$(echo "$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS" | head -n1)
+
+# Check if it's a directory
+if [ ! -d "$SELECTED_PATH" ]; then
+    notify-send -i changes-prevent-symbolic "VaultLock" "Selected item is not a folder" 2>/dev/null
+    exit 1
+fi
+
+# Try to find vaultlock
+VAULTLOCK=""
+if command -v vaultlock &>/dev/null; then
+    VAULTLOCK="vaultlock"
+elif [ -x "$(dirname "$0")/../../vaultlock/main.py" ]; then
+    VAULTLOCK="$(dirname "$0")/../../vaultlock/main.py"
+elif [ -x "$HOME/Desktop/locker/vaultlock/main.py" ]; then
+    VAULTLOCK="$HOME/Desktop/locker/vaultlock/main.py"
+fi
+
+if [ -z "$VAULTLOCK" ]; then
+    notify-send -i changes-prevent-symbolic "VaultLock" "VaultLock not found. Please install it first." 2>/dev/null
+    exit 1
+fi
+
+# Launch VaultLock with the selected folder
+if [ "$VAULTLOCK" = "vaultlock" ]; then
+    nohup vaultlock "$SELECTED_PATH" &>/dev/null &
+else
+    nohup python3 "$VAULTLOCK" "$SELECTED_PATH" &>/dev/null &
+fi
