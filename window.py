@@ -56,6 +56,7 @@ class VaultLockWindow(Adw.ApplicationWindow):
         self._operations_in_progress = set()
 
         self.set_default_size(450, 550)
+        self.set_icon_name("vaultlock")
 
         self._build_ui()
         self._load_saved_folders()
