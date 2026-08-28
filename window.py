@@ -9,7 +9,7 @@ GTK4 and libadwaita widgets for a modern GNOME look and feel.
 import gi
 
 gi.require_version("Gtk", "4.0")
-gi.require_version("Adw", "1.0")
+gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gtk
 
