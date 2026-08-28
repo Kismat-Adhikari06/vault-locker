@@ -20,7 +20,8 @@ echo "[1/4] Installing app launcher..."
 mkdir -p "$HOME/.local/share/applications"
 
 # Create a proper .desktop file with absolute Exec path
-cat > "$HOME/.local/share/applications/vaultlock.desktop" << EOF
+# The file MUST be named to match the application_id (com.vaultlock.app)
+cat > "$HOME/.local/share/applications/com.vaultlock.app.desktop" << EOF
 [Desktop Entry]
 Name=$APP_DISPLAY_NAME
 Comment=Lock and unlock folders with encryption
@@ -34,7 +35,7 @@ Keywords=folder;lock;encrypt;vault;security;
 StartupNotify=true
 EOF
 
-echo "  → $HOME/.local/share/applications/vaultlock.desktop"
+echo "  → $HOME/.local/share/applications/com.vaultlock.app.desktop"
 
 # --- 2. Install icons ---
 echo "[2/4] Installing icons..."
@@ -71,5 +72,5 @@ echo "  • Right-click folders → 'Lock with VaultLock'"
 echo "  • Run: python3 $SCRIPT_DIR/main.py"
 echo ""
 echo "To uninstall:"
-echo "  rm $HOME/.local/share/applications/vaultlock.desktop"
+echo "  rm $HOME/.local/share/applications/com.vaultlock.app.desktop"
 echo "  rm -r $HOME/.local/share/icons/hicolor/*/apps/$APP_NAME.png"
