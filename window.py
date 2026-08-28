@@ -10,6 +10,7 @@ Features:
 - Duplicate folder prevention
 - Reusable FolderItem component
 - Persistent storage: folders survive app restarts
+- Remove folders with locked folder warning
 """
 
 import os
@@ -159,6 +160,8 @@ class VaultLockWindow(Adw.ApplicationWindow):
         self._folder_paths.append(folder_path)
 
         item = FolderItem(folder_path)
+        item.connect("remove-request", self._on_folder_remove_request)
+
         self._folder_list.append(item)
         self._folder_widgets[folder_path] = item
         self._update_empty_state()
@@ -168,12 +171,31 @@ class VaultLockWindow(Adw.ApplicationWindow):
 
         print(f"[VaultLock] Added folder: {folder_path}")
 
+    def _remove_folder(self, folder_path):
+        self._folder_paths.remove(folder_path)
+        self._folder_widgets.pop(folder_path, None)
+
+        child = self._folder_list.get_first_child()
+        while child is not None:
+            next_child = child.get_next_sibling()
+            if isinstance(child, FolderItem) and child.folder_path == folder_path:
+                self._folder_list.remove(child)
+                break
+            child = next_child
+
+        self._update_empty_state()
+        self._storage.save_folders(self._folder_paths)
+        print(f"[VaultLock] Removed folder: {folder_path}")
+
     def _is_folder_added(self, folder_path):
         return folder_path in self._folder_paths
 
     def _update_empty_state(self):
         has_folders = len(self._folder_paths) > 0
         self._empty_state.set_visible(not has_folders)
+
+    def _on_folder_remove_request(self, item, folder_path):
+        self._remove_folder(folder_path)
 
     def _show_duplicate_error(self, folder_path):
         folder_name = os.path.basename(folder_path.rstrip(os.sep))

@@ -6,6 +6,7 @@ Each item displays:
 - A folder icon
 - The folder's display name (basename)
 - Full path as secondary text
+- Remove button
 """
 
 import os
@@ -60,6 +61,7 @@ class FolderItem(Gtk.ListBoxRow):
         name_label = Gtk.Label(label=self._folder_name)
         name_label.set_xalign(0)
         name_label.add_css_class("heading")
+        name_label.set_ellipsize(3)
         text_box.append(name_label)
 
         path_label = Gtk.Label(label=self._folder_path)
@@ -71,8 +73,18 @@ class FolderItem(Gtk.ListBoxRow):
 
         row_box.append(text_box)
 
+        remove_button = Gtk.Button(icon_name="user-trash-symbolic")
+        remove_button.add_css_class("flat")
+        remove_button.add_css_class("circular")
+        remove_button.set_tooltip_text("Remove folder")
+        remove_button.connect("clicked", self._on_remove_clicked)
+        row_box.append(remove_button)
+
         self.set_child(row_box)
 
     @property
     def folder_path(self) -> str:
         return self._folder_path
+
+    def _on_remove_clicked(self, button):
+        self.emit("remove-request", self._folder_path)
