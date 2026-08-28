@@ -67,7 +67,7 @@ class VaultLockWindow(Adw.ApplicationWindow):
         content_box.append(button_box)
 
         toolbar_view.set_content(content_box)
-        self.set_child(toolbar_view)
+        self.set_content(toolbar_view)
 
     def _build_header_bar(self) -> Adw.HeaderBar:
         header_bar = Adw.HeaderBar()
