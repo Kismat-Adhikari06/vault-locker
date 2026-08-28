@@ -5,9 +5,10 @@ Main window module for VaultLock.
 Features:
 - Header bar with title and subtitle
 - Scrollable folder list using Gtk.ListBox
-- Dynamic empty state (shown when no folders are added)
-- Folder chooser dialog using modern GTK4 FileDialog API
-- Duplicate folder prevention with error feedback
+- Dynamic empty state
+- Folder chooser dialog
+- Duplicate folder prevention
+- Reusable FolderItem component
 """
 
 import os
@@ -19,6 +20,8 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gtk
 
+from folder_item import FolderItem
+
 
 class VaultLockWindow(Adw.ApplicationWindow):
     """The main application window for VaultLock."""
@@ -27,6 +30,7 @@ class VaultLockWindow(Adw.ApplicationWindow):
         super().__init__(**kwargs)
 
         self._folder_paths = []
+        self._folder_widgets = {}
 
         self.set_default_size(450, 550)
 
@@ -141,29 +145,11 @@ class VaultLockWindow(Adw.ApplicationWindow):
     def _add_folder(self, folder_path):
         self._folder_paths.append(folder_path)
 
-        # Create a simple row
-        row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        row_box.set_margin_top(8)
-        row_box.set_margin_bottom(8)
-        row_box.set_margin_start(12)
-        row_box.set_margin_end(12)
-
-        icon = Gtk.Image.new_from_icon_name("folder-symbolic")
-        icon.set_pixel_size(32)
-        icon.add_css_class("accent")
-        row_box.append(icon)
-
-        name = os.path.basename(folder_path.rstrip(os.sep))
-        label = Gtk.Label(label=name)
-        label.set_xalign(0)
-        label.set_hexpand(True)
-        row_box.append(label)
-
-        row = Gtk.ListBoxRow()
-        row.set_child(row_box)
-        self._folder_list.append(row)
-
+        item = FolderItem(folder_path)
+        self._folder_list.append(item)
+        self._folder_widgets[folder_path] = item
         self._update_empty_state()
+
         print(f"[VaultLock] Added folder: {folder_path}")
 
     def _is_folder_added(self, folder_path):
