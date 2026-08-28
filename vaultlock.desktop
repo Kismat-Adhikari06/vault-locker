@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=VaultLock
+Comment=Lock and unlock folders with encryption
+Exec=vaultlock %f
+Icon=changes-prevent-symbolic
+Terminal=false
+Type=Application
+Categories=Utility;Security;System;
+MimeType=inode/directory;
+Keywords=folder;lock;encrypt;vault;security;
+StartupNotify=true
