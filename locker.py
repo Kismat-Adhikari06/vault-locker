@@ -141,6 +141,64 @@ def _remove_password_file(path: str):
         pass
 
 
+# ======================================================================
+# Permission management
+# ======================================================================
+
+def _save_permissions(folder_path: str, vault_path: str):
+    """
+    Save the original folder permissions to a metadata file in the vault.
+
+    Args:
+        folder_path: The folder whose permissions to save.
+        vault_path: The vault directory to store metadata in.
+    """
+    mode = os.stat(folder_path).st_mode & 0o7777  # permission bits only
+    meta_path = os.path.join(vault_path, ".vaultlock_perms")
+    with open(meta_path, "w") as f:
+        f.write(str(mode))
+
+
+def _load_permissions(vault_path: str) -> int:
+    """
+    Load the original folder permissions from vault metadata.
+
+    Args:
+        vault_path: The vault directory containing metadata.
+
+    Returns:
+        The original permission mode, or 0o755 if not found.
+    """
+    meta_path = os.path.join(vault_path, ".vaultlock_perms")
+    try:
+        with open(meta_path, "r") as f:
+            return int(f.read().strip())
+    except (FileNotFoundError, ValueError):
+        return 0o755  # default
+
+
+def _lock_permissions(folder_path: str):
+    """
+    Make a folder read-only (chmod 555) to prevent writes while locked.
+
+    Args:
+        folder_path: The folder to make read-only.
+    """
+    os.chmod(folder_path, 0o555)
+
+
+def _unlock_permissions(folder_path: str, vault_path: str):
+    """
+    Restore original folder permissions after unlocking.
+
+    Args:
+        folder_path: The folder to restore permissions on.
+        vault_path: The vault directory to read metadata from.
+    """
+    original_mode = _load_permissions(vault_path)
+    os.chmod(folder_path, original_mode)
+
+
 def create_vault(folder_path: str, password: str) -> str:
     """
     Create an encrypted gocryptfs vault for a folder.
@@ -259,6 +317,10 @@ def lock_folder(folder_path: str, password: str) -> str:
         # Step 4: Unmount — contents are now encrypted at rest
         _unmount(mount)
 
+        # Step 5: Save original permissions and make folder read-only
+        _save_permissions(folder_path, vault)
+        _lock_permissions(folder_path)
+
         return "Folder locked successfully"
 
     except Exception:
@@ -297,6 +359,9 @@ def unlock_folder(folder_path: str, password: str) -> str:
 
     try:
         os.makedirs(mount, exist_ok=True)
+
+        # Step 0: Restore folder permissions so we can write to it
+        _unlock_permissions(folder_path, vault)
 
         # Step 1: Mount the vault with password
         pw_file = _write_password_file(password)
