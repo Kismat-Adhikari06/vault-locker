@@ -9,6 +9,7 @@ Features:
 - Folder chooser dialog
 - Duplicate folder prevention
 - Reusable FolderItem component
+- Persistent storage: folders survive app restarts
 """
 
 import os
@@ -21,6 +22,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk
 
 from folder_item import FolderItem
+from storage import FolderStorage
 
 
 class VaultLockWindow(Adw.ApplicationWindow):
@@ -29,12 +31,14 @@ class VaultLockWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+        self._storage = FolderStorage()
         self._folder_paths = []
         self._folder_widgets = {}
 
         self.set_default_size(450, 550)
 
         self._build_ui()
+        self._load_saved_folders()
 
     def _build_ui(self):
         toolbar_view = Adw.ToolbarView()
@@ -115,6 +119,15 @@ class VaultLockWindow(Adw.ApplicationWindow):
         button_box.append(add_button)
         return button_box
 
+    def _load_saved_folders(self):
+        saved = self._storage.load_folders()
+        if not saved:
+            return
+        print(f"[VaultLock] Loaded {len(saved)} saved folder(s)")
+        for path in saved:
+            if path not in self._folder_paths:
+                self._add_folder(path, save=False)
+
     def _on_add_folder_clicked(self, button):
         dialog = Gtk.FileDialog()
         dialog.set_title("Select a Folder to Lock")
@@ -140,15 +153,18 @@ class VaultLockWindow(Adw.ApplicationWindow):
             self._show_duplicate_error(folder_path)
             return
 
-        self._add_folder(folder_path)
+        self._add_folder(folder_path, save=True)
 
-    def _add_folder(self, folder_path):
+    def _add_folder(self, folder_path, save=True):
         self._folder_paths.append(folder_path)
 
         item = FolderItem(folder_path)
         self._folder_list.append(item)
         self._folder_widgets[folder_path] = item
         self._update_empty_state()
+
+        if save:
+            self._storage.save_folders(self._folder_paths)
 
         print(f"[VaultLock] Added folder: {folder_path}")
 
