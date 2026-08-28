@@ -45,6 +45,7 @@ class FolderItem(Gtk.ListBoxRow):
         "password-request": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "lock-request": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "unlock-request": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "change-password-request": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
     }
 
     def __init__(self, folder_path: str, has_password: bool = False,
@@ -127,6 +128,14 @@ class FolderItem(Gtk.ListBoxRow):
         self._unlock_button.set_tooltip_text("Decrypt and unlock this folder")
         self._unlock_button.connect("clicked", self._on_unlock_clicked)
         buttons_box.append(self._unlock_button)
+
+        # Change Password button
+        self._change_pw_button = Gtk.Button(label="Change Password")
+        self._change_pw_button.add_css_class("flat")
+        self._change_pw_button.add_css_class("circular")
+        self._change_pw_button.set_tooltip_text("Change the password for this folder")
+        self._change_pw_button.connect("clicked", self._on_change_pw_clicked)
+        buttons_box.append(self._change_pw_button)
 
         # Remove button
         remove_button = Gtk.Button(icon_name="user-trash-symbolic")
@@ -253,23 +262,28 @@ class FolderItem(Gtk.ListBoxRow):
             self._password_button.set_visible(False)
             self._lock_button.set_visible(False)
             self._unlock_button.set_visible(False)
+            self._change_pw_button.set_visible(False)
         elif self._missing:
             # Missing: only show Remove
             self._password_button.set_visible(False)
             self._lock_button.set_visible(False)
             self._unlock_button.set_visible(False)
+            self._change_pw_button.set_visible(False)
         elif self._locked:
             self._password_button.set_visible(False)
             self._lock_button.set_visible(False)
             self._unlock_button.set_visible(True)
+            self._change_pw_button.set_visible(False)
         elif self._has_password:
             self._password_button.set_visible(False)
             self._lock_button.set_visible(True)
             self._unlock_button.set_visible(False)
+            self._change_pw_button.set_visible(True)
         else:
             self._password_button.set_visible(True)
             self._lock_button.set_visible(True)
             self._unlock_button.set_visible(False)
+            self._change_pw_button.set_visible(False)
 
     # ------------------------------------------------------------------
     # Signal handlers
@@ -286,3 +300,6 @@ class FolderItem(Gtk.ListBoxRow):
 
     def _on_unlock_clicked(self, button):
         self.emit("unlock-request", self._folder_path)
+
+    def _on_change_pw_clicked(self, button):
+        self.emit("change-password-request", self._folder_path)

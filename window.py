@@ -466,6 +466,7 @@ class VaultLockWindow(Adw.ApplicationWindow):
         item.connect("password-request", self._on_folder_password_request)
         item.connect("lock-request", self._on_folder_lock_request)
         item.connect("unlock-request", self._on_folder_unlock_request)
+        item.connect("change-password-request", self._on_folder_change_password_request)
 
         self._folder_list.append(item)
         self._folder_widgets[folder_path] = item
@@ -643,6 +644,133 @@ class VaultLockWindow(Adw.ApplicationWindow):
         if not folder_name:
             folder_name = folder_path
         print(f"[VaultLock] Password set for: {folder_name}")
+
+    def _on_folder_change_password_request(self, item, folder_path):
+        """Show the Change Password dialog."""
+        folder_name = os.path.basename(folder_path.rstrip(os.sep))
+        if not folder_name:
+            folder_name = folder_path
+
+        dialog = Adw.AlertDialog(
+            heading=f"Change Password for {folder_name}",
+            body="Enter your current password and choose a new one.",
+        )
+
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        content_box.set_margin_top(8)
+
+        # Current password
+        current_entry = Gtk.PasswordEntry()
+        current_entry.set_show_peek_icon(True)
+        current_entry.set_tooltip_text("Current password")
+
+        current_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        current_label = Gtk.Label(label="Current Password:")
+        current_label.set_xalign(0)
+        current_row.append(current_label)
+        current_row.append(current_entry)
+        content_box.append(current_row)
+
+        # New password
+        new_entry = Gtk.PasswordEntry()
+        new_entry.set_show_peek_icon(True)
+        new_entry.set_tooltip_text("New password")
+
+        new_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        new_label = Gtk.Label(label="New Password:")
+        new_label.set_xalign(0)
+        new_row.append(new_label)
+        new_row.append(new_entry)
+        content_box.append(new_row)
+
+        # Confirm new password
+        confirm_entry = Gtk.PasswordEntry()
+        confirm_entry.set_show_peek_icon(True)
+        confirm_entry.set_tooltip_text("Confirm new password")
+
+        confirm_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        confirm_label = Gtk.Label(label="Confirm New Password:")
+        confirm_label.set_xalign(0)
+        confirm_row.append(confirm_label)
+        confirm_row.append(confirm_entry)
+        content_box.append(confirm_row)
+
+        dialog.set_extra_child(content_box)
+
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("save", "Change Password")
+        dialog.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DEFAULT)
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def on_response(dlg, response):
+            if response == "save":
+                self._handle_password_change(
+                    folder_path,
+                    current_entry.get_text(),
+                    new_entry.get_text(),
+                    confirm_entry.get_text(),
+                )
+
+        dialog.connect("response", on_response)
+        dialog.present(self)
+
+    def _handle_password_change(self, folder_path, current_pw, new_pw, confirm_pw):
+        """Process a password change request."""
+        if not current_pw:
+            self._show_error("Empty Password", "Current password cannot be empty.")
+            return
+
+        if not new_pw:
+            self._show_error("Empty Password", "New password cannot be empty.")
+            return
+
+        if new_pw != confirm_pw:
+            self._show_error("Passwords Don't Match", "The new passwords do not match.")
+            return
+
+        if current_pw == new_pw:
+            self._show_error("Same Password", "New password must be different from current password.")
+            return
+
+        widget = self._folder_widgets.get(folder_path)
+        if widget:
+            widget.set_loading(True, "Changing password...")
+
+        self._operations_in_progress.add(folder_path)
+
+        def do_change():
+            try:
+                from locker import change_password
+                change_password(folder_path, current_pw, new_pw)
+                # Update stored hash
+                from security import hash_password
+                hashed = hash_password(new_pw)
+                self._storage.update_folder_password(folder_path, hashed, locked=False)
+                GLib.idle_add(self._on_password_change_complete, folder_path, True, None)
+            except Exception as e:
+                GLib.idle_add(self._on_password_change_complete, folder_path, False, str(e))
+
+        thread = threading.Thread(target=do_change, daemon=True)
+        thread.start()
+
+    def _on_password_change_complete(self, folder_path, success, error):
+        """Called on main thread after password change completes."""
+        self._operations_in_progress.discard(folder_path)
+        widget = self._folder_widgets.get(folder_path)
+        if widget:
+            widget.set_loading(False)
+
+        if error:
+            self._show_error("Password Change Failed", str(error))
+        else:
+            folder_name = os.path.basename(folder_path.rstrip(os.sep))
+            if not folder_name:
+                folder_name = folder_path
+            print(f"[VaultLock] Password changed for: {folder_name}")
+
+        return False
 
     # ==================================================================
     # Lock / Unlock

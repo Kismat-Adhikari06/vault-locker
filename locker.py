@@ -403,6 +403,51 @@ def unlock_folder(folder_path: str, password: str) -> str:
         raise
 
 
+def change_password(folder_path: str, old_password: str, new_password: str) -> str:
+    """
+    Change the password for a locked folder's vault.
+
+    Uses gocryptfs -passwd to re-encrypt the vault key with the new password.
+    The actual file contents are NOT re-encrypted — only the master key wrapper
+    is updated.
+
+    Args:
+        folder_path: The absolute path of the locked folder.
+        old_password: The current password.
+        new_password: The new password to set.
+
+    Returns:
+        A success message.
+
+    Raises:
+        RuntimeError: If gocryptfs fails (e.g., wrong old password).
+        ValueError: If the folder is not locked.
+    """
+    if not is_locked(folder_path):
+        raise ValueError("Folder is not locked")
+
+    vault = _vault_path(folder_path)
+
+    # Pipe old and new passwords to gocryptfs -passwd
+    password_input = f"{old_password}\n{new_password}\n"
+
+    result = subprocess.run(
+        ["gocryptfs", "-passwd", vault],
+        input=password_input,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        if "Decrypting master key" in stderr or "wrong" in stderr.lower():
+            raise RuntimeError("Wrong password")
+        raise RuntimeError(f"Password change failed: {stderr}")
+
+    return "Password changed successfully"
+
+
 # ======================================================================
 # Internal helpers
 # ======================================================================
