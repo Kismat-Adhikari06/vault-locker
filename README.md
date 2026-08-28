@@ -83,6 +83,11 @@ vaultlock/
 │   ├── install.sh       # Auto-installer for detected file managers
 │   ├── nautilus/        # Nautilus/Nemo script
 │   └── dolphin/         # KDE Dolphin service menu
+├── setup.py             # Package installation
+├── requirements.txt     # Python dependencies
+├── CONTRIBUTING.md      # Contributing guide
+├── CHANGELOG.md         # Version history
+├── LICENSE              # MIT License
 └── README.md
 ```
 
