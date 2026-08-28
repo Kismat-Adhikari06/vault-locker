@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Service
+X-KDE-ServiceTypes=ServiceMenu
+X-KDE-Submenu=VaultLock
+Name=Lock with VaultLock
+Comment=Add folder to VaultLock for encryption
+Icon=changes-prevent-symbolic
+MimeType=inode/directory;
+X-KDE-Protocol=file
