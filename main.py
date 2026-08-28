@@ -39,8 +39,6 @@ class VaultLockApp(Adw.Application):
             application_id="com.vaultlock.app",
             flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
         )
-        # Set the app icon (matches installed icon name)
-        self.set_icon_name("vaultlock")
         # Folder path passed via CLI (for file manager integration)
         self._initial_folder = None
 
