@@ -528,9 +528,16 @@ class VaultLockWindow(Adw.ApplicationWindow):
         if not folder_name:
             folder_name = folder_path
 
+        if is_locked:
+            body = (f"\"{folder_name}\" is locked.\n\n"
+                     "Enter the password to unlock and restore your files,\n"
+                     "then remove it from VaultLock.")
+        else:
+            body = (f"Enter the password for \"{folder_name}\" to confirm removal.")
+
         dialog = Adw.AlertDialog(
             heading=f"Remove {folder_name}?",
-            body="Enter the folder password to confirm removal.",
+            body=body,
         )
 
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -566,8 +573,8 @@ class VaultLockWindow(Adw.ApplicationWindow):
                     self._show_error("Wrong Password", "The password you entered is incorrect.")
                     return
 
-                # Password correct — proceed with removal
-                self._do_remove_folder(folder_path, is_locked)
+                # Password correct — proceed with removal (pass password for unlock)
+                self._do_remove_folder(folder_path, is_locked, password=password)
 
         dialog.connect("response", on_response)
         dialog.present(self)
@@ -596,15 +603,18 @@ class VaultLockWindow(Adw.ApplicationWindow):
         dialog.connect("response", on_response)
         dialog.present(self)
 
-    def _do_remove_folder(self, folder_path, is_locked):
-        """Actually remove the folder — clean up vault if locked, then remove from list."""
-        if is_locked:
-            import shutil
-            from locker import _vault_path
-            vault = _vault_path(folder_path)
-            if os.path.exists(vault):
-                shutil.rmtree(vault, ignore_errors=True)
-                print(f"[VaultLock] Deleted vault: {vault}")
+    def _do_remove_folder(self, folder_path, is_locked, password=None):
+        """Remove folder from VaultLock list. If locked, unlock first to restore files."""
+        if is_locked and password:
+            # Unlock the folder first so files are restored to original location
+            try:
+                from locker import unlock_folder
+                unlock_folder(folder_path, password)
+                self._storage.update_lock_status(folder_path, locked=False)
+                print(f"[VaultLock] Unlocked folder before removal: {folder_path}")
+            except Exception as e:
+                self._show_error("Unlock Failed", f"Could not unlock folder: {e}")
+                return
         self._remove_folder(folder_path)
 
     def _show_duplicate_error(self, folder_path):
