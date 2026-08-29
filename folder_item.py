@@ -273,12 +273,12 @@ class FolderItem(Gtk.ListBoxRow):
             self._password_button.set_visible(False)
             self._lock_button.set_visible(False)
             self._unlock_button.set_visible(True)
-            self._change_pw_button.set_visible(False)
+            self._change_pw_button.set_visible(self._has_password)
         elif self._has_password:
             self._password_button.set_visible(False)
             self._lock_button.set_visible(True)
             self._unlock_button.set_visible(False)
-            self._change_pw_button.set_visible(True)
+            self._change_pw_button.set_visible(False)
         else:
             self._password_button.set_visible(True)
             self._lock_button.set_visible(True)

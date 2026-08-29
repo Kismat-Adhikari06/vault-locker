@@ -747,7 +747,7 @@ class VaultLockWindow(Adw.ApplicationWindow):
                 # Update stored hash
                 from security import hash_password
                 hashed = hash_password(new_pw)
-                self._storage.update_folder_password(folder_path, hashed, locked=False)
+                self._storage.update_folder_password(folder_path, hashed, locked=True)
                 GLib.idle_add(self._on_password_change_complete, folder_path, True, None)
             except Exception as e:
                 GLib.idle_add(self._on_password_change_complete, folder_path, False, str(e))
