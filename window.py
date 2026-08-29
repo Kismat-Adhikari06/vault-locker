@@ -501,32 +501,86 @@ class VaultLockWindow(Adw.ApplicationWindow):
         self._empty_state.set_visible(not has_folders)
 
     def _on_folder_remove_request(self, item, folder_path):
-        """Handle remove request — show warning if folder is locked."""
-        # Check if the folder is currently locked
+        """Handle remove request — ask for password if one is set."""
+        folder_name = os.path.basename(folder_path.rstrip(os.sep))
+        if not folder_name:
+            folder_name = folder_path
+
+        # Check if this folder has a password set
         entries = self._storage.load_folder_entries()
+        has_password = False
         is_folder_locked = False
         for entry in entries:
             if entry.get("path") == folder_path:
+                has_password = bool(entry.get("password_hash"))
                 is_folder_locked = entry.get("locked", False)
                 break
 
-        if is_folder_locked:
-            self._show_locked_remove_warning(folder_path)
+        if has_password:
+            self._show_remove_password_dialog(folder_path, is_folder_locked)
         else:
-            self._remove_folder(folder_path)
+            # No password set — ask for simple confirmation
+            self._show_remove_confirm_dialog(folder_path)
 
-    def _show_locked_remove_warning(self, folder_path):
-        """Show a warning when trying to remove a locked folder."""
+    def _show_remove_password_dialog(self, folder_path, is_locked):
+        """Show a password dialog when removing a password-protected folder."""
         folder_name = os.path.basename(folder_path.rstrip(os.sep))
         if not folder_name:
             folder_name = folder_path
 
         dialog = Adw.AlertDialog(
-            heading="Remove Locked Folder?",
-            body=f'"{folder_name}" is currently locked.\n\n'
-                 "The encrypted vault will be permanently deleted and "
-                 "you will lose access to the locked data.\n\n"
-                 "Are you sure you want to remove it?",
+            heading=f"Remove {folder_name}?",
+            body="Enter the folder password to confirm removal.",
+        )
+
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        content_box.set_margin_top(8)
+
+        pw_label = Gtk.Label(label="Password:")
+        pw_label.set_xalign(0)
+        content_box.append(pw_label)
+
+        password_entry = Gtk.PasswordEntry()
+        password_entry.set_show_peek_icon(True)
+        password_entry.set_tooltip_text("Enter folder password")
+        content_box.append(password_entry)
+
+        dialog.set_extra_child(content_box)
+
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("remove", "Remove")
+        dialog.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DEFAULT)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+
+        def on_response(dlg, response):
+            if response == "remove":
+                password = password_entry.get_text()
+                if not password:
+                    self._show_error("Empty Password", "Password cannot be empty.")
+                    return
+
+                # Verify password against stored hash
+                if not verify_folder_password(folder_path, password):
+                    self._show_error("Wrong Password", "The password you entered is incorrect.")
+                    return
+
+                # Password correct — proceed with removal
+                self._do_remove_folder(folder_path, is_locked)
+
+        dialog.connect("response", on_response)
+        dialog.present(self)
+
+    def _show_remove_confirm_dialog(self, folder_path):
+        """Show a confirmation dialog for removing a folder with no password."""
+        folder_name = os.path.basename(folder_path.rstrip(os.sep))
+        if not folder_name:
+            folder_name = folder_path
+
+        dialog = Adw.AlertDialog(
+            heading=f"Remove {folder_name}?",
+            body="Are you sure you want to remove this folder from VaultLock?",
         )
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("remove", "Remove")
@@ -537,17 +591,21 @@ class VaultLockWindow(Adw.ApplicationWindow):
 
         def on_response(dlg, response):
             if response == "remove":
-                # Clean up the vault before removing from the list
-                import shutil
-                from locker import _vault_path
-                vault = _vault_path(folder_path)
-                if os.path.exists(vault):
-                    shutil.rmtree(vault, ignore_errors=True)
-                    print(f"[VaultLock] Deleted vault: {vault}")
-                self._remove_folder(folder_path)
+                self._do_remove_folder(folder_path, is_locked=False)
 
         dialog.connect("response", on_response)
         dialog.present(self)
+
+    def _do_remove_folder(self, folder_path, is_locked):
+        """Actually remove the folder — clean up vault if locked, then remove from list."""
+        if is_locked:
+            import shutil
+            from locker import _vault_path
+            vault = _vault_path(folder_path)
+            if os.path.exists(vault):
+                shutil.rmtree(vault, ignore_errors=True)
+                print(f"[VaultLock] Deleted vault: {vault}")
+        self._remove_folder(folder_path)
 
     def _show_duplicate_error(self, folder_path):
         folder_name = os.path.basename(folder_path.rstrip(os.sep))
