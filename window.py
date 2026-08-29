@@ -61,6 +61,9 @@ class VaultLockWindow(Adw.ApplicationWindow):
         self._build_ui()
         self._load_saved_folders()
 
+        # Auto-check folder existence every 3 seconds
+        GLib.timeout_add(3000, self._auto_check_folders)
+
     def _set_window_icon(self):
         """Set the window icon using the installed vaultlock icon."""
         self.set_icon_name("vaultlock")
@@ -353,6 +356,29 @@ class VaultLockWindow(Adw.ApplicationWindow):
         else:
             # Show brief "all good" indicator
             self._show_toast("All folder statuses updated")
+
+    def _auto_check_folders(self):
+        """Periodically check if any folders have been deleted or renamed."""
+        for path in list(self._folder_paths):
+            widget = self._folder_widgets.get(path)
+            if not widget:
+                continue
+
+            # Skip if operation in progress
+            if path in self._operations_in_progress:
+                continue
+
+            folder_exists = os.path.isdir(path)
+            actual_locked = is_locked(path)
+
+            if not folder_exists and not actual_locked:
+                # Folder gone and not locked — mark as missing
+                widget.set_missing()
+            elif not folder_exists and actual_locked:
+                # Folder gone but vault exists — keep locked
+                widget.set_locked()
+
+        return True  # Keep the timer running
 
     def _show_toast(self, message):
         """Show a toast notification at the bottom of the window."""
