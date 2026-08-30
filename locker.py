@@ -21,6 +21,7 @@ Unlocking flow:
 import hashlib
 import os
 import shutil
+import signal
 import stat
 import subprocess
 import tempfile
@@ -175,6 +176,78 @@ def _load_permissions(vault_path: str) -> int:
             return int(f.read().strip())
     except (FileNotFoundError, ValueError):
         return 0o755  # default
+
+
+def _kill_folder_processes(folder_path: str):
+    """
+    Kill any processes that have files open in the given folder.
+
+    This prevents viewers/players from continuing to access files
+    after they are moved into the encrypted vault during locking.
+
+    Uses lsof -t +D to get PIDs with open file handles,
+    then sends SIGTERM to each (excluding our own process).
+    Falls back to SIGKILL if SIGTERM doesn't work within 1 second.
+
+    Args:
+        folder_path: The folder whose open-file processes to kill.
+    """
+    current_pid = os.getpid()
+
+    try:
+        # -t outputs only PIDs (one per line), avoids parsing issues
+        # with multi-word command names like "GNOME Videos"
+        # NOTE: lsof returns non-zero when it finds matches, so we
+        # check stdout first rather than the return code.
+        result = subprocess.run(
+            ["lsof", "-t", "+D", folder_path],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if not result.stdout.strip():
+            return  # No processes found
+
+        pids = set()
+        for line in result.stdout.strip().split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                pid = int(line)
+                if pid != current_pid:
+                    pids.add(pid)
+            except ValueError:
+                continue
+
+        if not pids:
+            return
+
+        print(f"[VaultLock] Found {len(pids)} process(es) with open files: {pids}")
+
+        # First try SIGTERM (graceful shutdown)
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGTERM)
+                print(f"[VaultLock] Sent SIGTERM to process {pid}")
+            except (OSError, ProcessLookupError):
+                pass
+
+        # Wait for processes to terminate
+        import time
+        time.sleep(1.0)
+
+        # If any are still alive, force kill with SIGKILL
+        for pid in pids:
+            try:
+                os.kill(pid, 0)  # Check if still alive
+                os.kill(pid, signal.SIGKILL)
+                print(f"[VaultLock] Sent SIGKILL to process {pid}")
+            except (OSError, ProcessLookupError):
+                pass
+
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass  # lsof not installed or timed out — skip gracefully
 
 
 def _lock_permissions(folder_path: str):
