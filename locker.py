@@ -386,17 +386,29 @@ def lock_folder(folder_path: str, password: str) -> str:
         # after they are moved into the encrypted vault.
         _kill_folder_processes(folder_path)
 
-        # Step 3: Move original contents into the mounted vault
-        for item in os.listdir(folder_path):
-            src = os.path.join(folder_path, item)
+        # Step 3: Save original permissions before we modify the folder
+        _save_permissions(folder_path, vault)
+
+        # Step 4: Make folder appear empty INSTANTLY by renaming it
+        # os.rename is atomic on the same filesystem — all files disappear
+        # at once from the user's perspective.
+        temp_folder = folder_path + ".vaultlock_tmp"
+        os.rename(folder_path, temp_folder)
+        os.makedirs(folder_path, exist_ok=True)
+
+        # Step 5: Move original contents into the mounted vault
+        for item in os.listdir(temp_folder):
+            src = os.path.join(temp_folder, item)
             dst = os.path.join(mount, item)
             shutil.move(src, dst)
 
-        # Step 4: Unmount — contents are now encrypted at rest
+        # Step 6: Unmount — contents are now encrypted at rest
         _unmount(mount)
 
-        # Step 5: Save original permissions and make folder read-only
-        _save_permissions(folder_path, vault)
+        # Step 7: Clean up the temporary folder
+        shutil.rmtree(temp_folder, ignore_errors=True)
+
+        # Step 8: Make the new (empty) folder read-only
         _lock_permissions(folder_path)
 
         return "Folder locked successfully"
