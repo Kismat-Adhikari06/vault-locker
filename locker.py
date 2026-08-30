@@ -381,6 +381,11 @@ def lock_folder(folder_path: str, password: str) -> str:
             shutil.rmtree(vault, ignore_errors=True)
             raise RuntimeError(f"gocryptfs mount failed: {result.stderr.strip()}")
 
+        # Step 2.5: Kill any processes with files open in the folder
+        # This prevents viewers/players from keeping access to files
+        # after they are moved into the encrypted vault.
+        _kill_folder_processes(folder_path)
+
         # Step 3: Move original contents into the mounted vault
         for item in os.listdir(folder_path):
             src = os.path.join(folder_path, item)
